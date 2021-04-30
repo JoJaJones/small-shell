@@ -28,8 +28,10 @@ struct command{
     char **args;
     int numArgs;
     int isBgProcess;
-    int outfileIdx;
-    int infileIdx;
+    int hasOutfile;
+    char *outfile;
+    int hasInfile;
+    char *infile;
 };
 
 struct command *parseInput(char *input, char **args, int isForeOnlyMode);

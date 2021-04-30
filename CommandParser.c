@@ -57,8 +57,8 @@ struct command *parseInput(char *input, char **args, int isForeOnlyMode) {
 
     // create the command structure and set the file indices to invalid settings
     struct command *parsedCommand = calloc(1, sizeof(struct command));
-    parsedCommand->outfileIdx = -1;
-    parsedCommand->infileIdx = -1;
+    parsedCommand->hasOutfile = FALSE;
+    parsedCommand->hasInfile = FALSE;
 
     // strip the whitespace from the raw command and set the number of args
     parsedCommand->numArgs = numArg;
@@ -66,7 +66,6 @@ struct command *parseInput(char *input, char **args, int isForeOnlyMode) {
 
     // parse each arg, performing variable expansion as necessary
     parseAllArgs(args, parsedCommand, isForeOnlyMode);
-
     // if the command is echo, make it print purple
     if (strcmp(parsedCommand->args[0], "echo") == 0) echoModifier(parsedCommand);
 
@@ -115,11 +114,10 @@ void parseAllArgs(char **args, struct command *cmd, int isForeOnlyMode) {
     int i, ptrIdx = cmd->numArgs;
 
     // iterate through args
-    for (i = 0; i < ptrIdx; i++){
+    for (i = 0; i < ptrIdx; i++) {
         args[i] = parseArg(args[i]);  // parse each arg
-
         // if new the end of the arg list
-        if (i >= ptrIdx - 5){
+        if (i >= ptrIdx - 5) {
             // check for input file and update cmd appropriately
             if (strcmp(args[i], "<") == 0) {
                 // free the arg
@@ -127,24 +125,28 @@ void parseAllArgs(char **args, struct command *cmd, int isForeOnlyMode) {
                 args[i] = NULL;
 
                 // set index and adjust number of arguments
-                cmd->infileIdx = i + 1;
+                cmd->hasInfile = TRUE;
+                cmd->infile = parseArg(args[i + 1]);
+                args[i + 1] = NULL;
                 cmd->numArgs -= 2;
-
-            // check for output file and update cmd appropriately
-            } else if (strcmp(args[i], ">") == 0){
+                i++;
+                // check for output file and update cmd appropriately
+            } else if (strcmp(args[i], ">") == 0) {
                 // free the arg
                 free(args[i]);
                 args[i] = NULL;
 
                 // set index and adjust number of arguments
-                cmd->outfileIdx = i + 1;
+                cmd->hasOutfile = TRUE;
+                cmd->outfile = parseArg(args[i + 1]);
+                args[i + 1] = NULL;
                 cmd->numArgs -= 2;
+                i++;
             }
         }
     }
-
     // check if command should be run in background
-    if (strcmp(args[ptrIdx - 1], "&") == 0) {
+    if (args[ptrIdx - 1] && strcmp(args[ptrIdx - 1], "&") == 0) {
         // if the command is not a built in command and we're not in forground only mode
         // set isBgProcess to true
         cmd->isBgProcess = (!isBuiltIn(args[0]) && !isForeOnlyMode);
@@ -170,7 +172,7 @@ char *parseArg(char *rawArg) {
     int pidLen = atoi(getenv(PID_LEN));
 
     // count the number of variables that need expansion in the argument
-    int varToExpand = countVars(rawArg), newLength;
+    int newLength, varToExpand = countVars(rawArg);
 
     // calculate the new length of the arg after expansion
     newLength = (pidLen - 2) * varToExpand + strlen(rawArg) + 1;
@@ -249,15 +251,15 @@ void freeCommand(struct command *cmd) {
     }
 
     // if there's an outfile character array free it
-    if (cmd->outfileIdx != -1){
-        free(cmd->args[cmd->outfileIdx]);
-        cmd->args[cmd->outfileIdx] = NULL;
+    if (cmd->hasOutfile == TRUE){
+        free(cmd->outfile);
+        cmd->outfile = NULL;
     }
 
     // if there's an infile character array free it
-    if (cmd->infileIdx != -1){
-        free(cmd->args[cmd->infileIdx]);
-        cmd->args[cmd->infileIdx] = NULL;
+    if (cmd->hasInfile == TRUE){
+        free(cmd->infile);
+        cmd->infile = NULL;
     }
 
     // free the memory for the base structure
@@ -270,16 +272,16 @@ void freeCommand(struct command *cmd) {
  * @param cmd: command to have it's redirect set to null
  ************************************************************************************/
 void setNullRedirects(struct command *cmd) {
-    if (cmd->infileIdx == -1 &&  cmd->numArgs < 509) {
-        cmd->infileIdx = cmd->numArgs + 1;
-        cmd->args[cmd->infileIdx] = calloc(strlen("/dev/null") + 1, sizeof(char));
-        sprintf(cmd->args[cmd->infileIdx], "/dev/null");
+    if (!cmd->hasInfile) {
+        cmd->hasInfile = TRUE;
+        cmd->infile = calloc(strlen("/dev/null") + 1, sizeof(char));
+        sprintf(cmd->infile, "/dev/null");
     }
 
-    if (cmd->outfileIdx == -1 &&  cmd->numArgs <= 509) {
-        cmd->outfileIdx = cmd->numArgs + 2;
-        cmd->args[cmd->outfileIdx] = calloc(strlen("/dev/null") + 1, sizeof(char));
-        sprintf(cmd->args[cmd->outfileIdx], "/dev/null");
+    if (!cmd->hasOutfile) {
+        cmd->hasOutfile = TRUE;
+        cmd->outfile = calloc(strlen("/dev/null") + 1, sizeof(char));
+        sprintf(cmd->outfile, "/dev/null");
     }
 }
 

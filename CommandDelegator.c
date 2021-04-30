@@ -314,23 +314,24 @@ int removeProcess(struct processLinkedList *procList, int pid) {
  * return: flag indicating whether the open operation was successful
  ***********************************************************************************/
 int openRedirFile(struct command *cmd, int isOutput) {
-    int flags = 0, perms = 0750, idx = 0;
+    int flags = 0, perms = 0750;
+    char *fileName;
 
     // set flags based on whether opening for input or output
     if (!isOutput) {
         flags = O_RDONLY;
-        idx = cmd->infileIdx;
+        fileName = cmd->infile;
     } else {
         flags = O_WRONLY | O_TRUNC | O_CREAT;
-        idx = cmd->outfileIdx;
+        fileName = cmd->outfile;
     }
 
     // open the file
-    int fd = open(cmd->args[idx], flags, perms);
+    int fd = open(fileName, flags, perms);
 
     if (fd == -1){  //error state
         // print appropriate error message and exit with value 1
-        printf("cannot open %s for ", cmd->args[idx]);
+        printf("cannot open %s for ", fileName);
         if (isOutput){
             printf("output\n");
         } else {
@@ -360,13 +361,13 @@ int openRedirFiles(struct command *cmd) {
     int res = TRUE;  // status flag used to indicate if opening files was successful
 
     // if cmd has an infile index set then it needs an input file open for redirection
-    if (cmd->infileIdx != -1) {
+    if (cmd->hasInfile) {
         // open file for input redirection
         res &= openRedirFile(cmd, FALSE);
     }
 
     // if cmd has an outfile index set then it needs an output file open for redirection
-    if(cmd->outfileIdx != -1 && res) {
+    if(cmd->hasOutfile && res) {
         // open file for output redirection
         res &= openRedirFile(cmd, TRUE);
     }
